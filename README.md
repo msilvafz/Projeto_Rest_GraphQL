@@ -23,8 +23,8 @@ O objetivo deste projeto é desenvolver o **backend** de uma aplicação web com
   - JSON Web Token (JWT) para autenticação
   - MongoDB
   - Mongoose
-  
- - **Outras Ferramentas**:
+
+- **Outras Ferramentas**:
   - Git
   - Postman
 
