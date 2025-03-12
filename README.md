@@ -18,8 +18,7 @@ O objetivo deste projeto é desenvolver o **backend** de uma aplicação web com
 
 - **Backend**:
   - Node.js
-  - Express.js (para API RESTful)
-  - Apollo Server (para GraphQL)
+  - Express.js
   - JSON Web Token (JWT) para autenticação
   - MongoDB
   - Mongoose
