@@ -1,14 +1,22 @@
 const Cursos = require("../models/cursos");
-const User = require("../models/user");
+const Professor = require("../models/professor");
+const Aluno = require("../models/aluno");
 
 exports.createCursos = async (req, res) => {
   try {
     const { professorId, ...cursoData } = req.body;
 
     // Verifica se o professor já existe
-    const professor = await User.findById(professorId);
-    if (!professor || professor.tipo !== "Professor") {
+    const professor = await Professor.findById(professorId);
+    if (!professor) {
       return res.status(400).json({ message: "Professor inválido" });
+    }
+
+    // Verifica se o professor já está vinculado a um curso
+    if (professor.cursos) {
+      return res
+        .status(400)
+        .json({ message: "Este professor já está vinculado a outro curso" });
     }
 
     const curso = new Cursos({
@@ -19,7 +27,7 @@ exports.createCursos = async (req, res) => {
     await curso.save();
 
     // Associa o curso ao professor
-    professor.cursos.push(curso._id);
+    professor.cursos = curso._id;
     await professor.save();
 
     res.status(201).json({ message: "Curso criado com sucesso", curso });
@@ -40,18 +48,20 @@ exports.matricularAluno = async (req, res) => {
     }
 
     // Verifica se o aluno existe
-    const aluno = await User.findById(alunoId);
-    if (!aluno || aluno.tipo !== "Aluno") {
+    const aluno = await Aluno.findById(alunoId);
+    if (!aluno) {
       return res.status(400).json({ message: "Aluno inválido" });
     }
 
     // Verifica se o aluno já está matriculado no curso
-    if (curso.alunos.includes(alunoId)) {
-      return res.status(400).json({ message: "Aluno já está matriculado neste curso" });
+    if (curso.aluno.includes(alunoId)) {
+      return res
+        .status(400)
+        .json({ message: "Aluno já está matriculado neste curso" });
     }
 
     // Matricula o aluno no curso
-    curso.alunos.push(alunoId);
+    curso.aluno.push(alunoId);
     aluno.cursos.push(cursoId);
 
     await curso.save();
@@ -66,7 +76,10 @@ exports.matricularAluno = async (req, res) => {
 // Listar todos os cursos
 exports.getAllCursos = async (req, res) => {
   try {
-    const cursos = await Cursos.find();
+    const cursos = await Cursos.find()
+      .populate("professor", "nome email")
+      .populate("admin", "nome email");
+
     res.status(200).json(cursos);
   } catch (error) {
     res.status(400).json({ message: error.message });
@@ -80,8 +93,8 @@ exports.getCursoById = async (req, res) => {
 
     // Busca o curso pelo ID e mostra os alunos e os professores referentes ao curso
     const curso = await Cursos.findById(cursoId)
-      .populate("professor", "nome email tipo") // Retorna as informações do professor
-      .populate("alunos", "nome email tipo"); // Retorna as informações dos alunos
+      .populate("professor", "nome email") // Retorna as informações do professor
+      .populate("aluno", "nome email"); // Retorna as informações dos alunos
 
     if (!curso) {
       return res.status(404).json({ message: "Curso não encontrado" });
@@ -116,8 +129,14 @@ exports.deleteCursos = async (req, res) => {
       return res.status(404).json({ message: "Curso não encontrado" });
     }
 
-    // Remover referências do curso nos professores e alunos
-    await User.updateMany(
+    // Remover referências do curso nos professores
+    await Professor.updateMany(
+      { cursos: curso._id },
+      { $pull: { cursos: curso._id } }
+    );
+
+    // Remover referências do curso nos alunos
+    await Aluno.updateMany(
       { cursos: curso._id },
       { $pull: { cursos: curso._id } }
     );

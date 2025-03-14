@@ -1,97 +1,120 @@
-const User = require("../models/user");
+const Aluno = require("../models/aluno");
+const Professor = require("../models/professor");
+const Admin = require("../models/admin");
 
-exports.createUser = async (req, res) => {
-  try {
-    const user = await User.create(req.body);
-    res.status(201).json(user);
-  } catch (error) {
-    res.status(400).json({ message: error.message });
-  }
-};
-
-exports.createManyUser = async (req, res) => {
-  try {
-    const user = await User.insertMany(req.body);
-    res.status(201).json(user);
-  } catch (error) {
-    res.status(400).json({ message: error.message });
-  }
-};
-
-exports.getAllUser = async (req, res) => {
-  try {
-    const users = await User.find();
-    res.status(200).json(users);
-  } catch (error) {
-    res.status(400).json({ message: error.message });
-  }
-};
-
-exports.updateUser = async (req, res) => {
-  try {
-    const user = await User.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
-    });
-    res.status(200).json(user);
-  } catch (error) {
-    res.status(400).json({ message: error.message });
-  }
-};
-
+// Listar todos os usuários por tipo (Aluno, Professor, Admin)
 exports.getUsersByType = async (req, res) => {
   try {
     const { tipo } = req.params;
-    console.log("Tipo solicitado:", tipo);
-    const users = await User.find({ tipo });
-    console.log("Usuários encontrados:", users);
-    res.status(200).json(users);
-  } catch (error) {
-    console.error("Erro ao buscar usuários por tipo:", error);
-    res.status(400).json({ message: error.message });
-  }
-};
 
-exports.getUserById = async (req, res) => {
-  try {
-    const user = await User.findById(req.params.id);
-    if (!user) {
-      return res.status(404).json({ message: "Usuário não encontrado." });
-    }
-    res.status(200).json(user);
-  } catch (error) {
-    res.status(400).json({ message: error.message });
-  }
-};
-
-// Mostrar os cursos de um aluno pelo ID
-exports.getCursosByAluno = async (req, res) => {
-  try {
-    const alunoId = req.params.id;
-
-    // Verifica se o aluno realmente existe
-    const aluno = await User.findById(alunoId).populate("cursos", "nome descrição preço imagem video promoção");
-    if (!aluno || aluno.tipo !== "Aluno") {
-      return res.status(404).json({ message: "Aluno não encontrado ou inválido" });
+    let users;
+    if (tipo === "Aluno") {
+      users = await Aluno.find().populate("cursos", "nome");
+    } else if (tipo === "Professor") {
+      users = await Professor.find().populate("cursos", "nome");
+    } else if (tipo === "Admin") {
+      users = await Admin.find();
+    } else {
+      return res.status(400).json({ message: "Tipo de usuário inválido" });
     }
 
-    res.status(200).json({
-      aluno: {
-        _id: aluno._id,
-        nome: aluno.nome,
-        email: aluno.email,
-      },
-      cursos: aluno.cursos,
-    });
+    res.status(200).json({ users });
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
 };
 
+// Criar um novo usuário (o tipo será definido no corpo da requisição)
+exports.createUser = async (req, res) => {
+  try {
+    const { nome, email, senha, tipo } = req.body;
+
+    // Verificar o tipo de usuário
+    let newUser;
+    if (tipo === "Aluno") {
+      newUser = new Aluno({ nome, email, senha });
+    } else if (tipo === "Professor") {
+      newUser = new Professor({ nome, email, senha });
+    } else if (tipo === "Admin") {
+      newUser = new Admin({ nome, email, senha });
+    } else {
+      return res.status(400).json({ message: "Tipo de usuário inválido" });
+    }
+
+    await newUser.save();
+    res.status(201).json({ message: "Usuário criado com sucesso" });
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+};
+
+// Atualizar um usuário por ID
+exports.updateUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Verificar o tipo de usuário
+    const aluno = await Aluno.findById(id);
+    const professor = await Professor.findById(id);
+    const admin = await Admin.findById(id);
+
+    let updatedUser;
+    if (aluno) {
+      updatedUser = await Aluno.findByIdAndUpdate(id, req.body, { new: true });
+    } else if (professor) {
+      updatedUser = await Professor.findByIdAndUpdate(id, req.body, { new: true });
+    } else if (admin) {
+      updatedUser = await Admin.findByIdAndUpdate(id, req.body, { new: true });
+    } else {
+      return res.status(404).json({ message: "Usuário não encontrado" });
+    }
+
+    res.status(200).json({ message: "Usuário atualizado com sucesso", user: updatedUser });
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+};
+
+// Deletar um usuário por ID
 exports.deleteUser = async (req, res) => {
   try {
-    await User.findByIdAndDelete(req.params.id);
+    const { id } = req.params;
+
+    // Verificar o tipo de usuário
+    const aluno = await Aluno.findByIdAndDelete(id);
+    const professor = await Professor.findByIdAndDelete(id);
+    const admin = await Admin.findByIdAndDelete(id);
+
+    if (!aluno && !professor && !admin) {
+      return res.status(404).json({ message: "Usuário não encontrado" });
+    }
+
     res.status(200).json({ message: "Usuário deletado com sucesso" });
   } catch (error) {
     res.status(400).json({ message: error.message });
+  }
+};
+
+// Buscar um usuário por ID
+exports.getUserById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Verificar o tipo de usuário
+    const aluno = await Aluno.findById(id).populate("cursos", "nome");
+    const professor = await Professor.findById(id).populate("cursos", "nome");
+    const admin = await Admin.findById(id);
+
+    if (aluno) {
+      return res.status(200).json({ message: "Usuário encontrado com sucesso", user: aluno });
+    } else if (professor) {
+      return res.status(200).json({ message: "Usuário encontrado com sucesso", user: professor });
+    } else if (admin) {
+      return res.status(200).json({ message: "Usuário encontrado com sucesso", user: admin });
+    } else {
+      return res.status(404).json({ message: "Usuário não encontrado" });
+    }
+  } catch (error) {
+    res.status(400).json({ message: "Erro ao buscar usuário" }); 
   }
 };

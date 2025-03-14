@@ -1,13 +1,31 @@
 const bcryptjs = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const User = require("../models/user");
+const Aluno = require("../models/aluno");
+const Professor = require("../models/professor");
+const Admin = require("../models/admin");
+
+// Função auxiliar para buscar usuário por tipo e email
+const findUserByType = async (tipo, email) => {
+  let model;
+  if (tipo === "Aluno") model = Aluno;
+  else if (tipo === "Professor") model = Professor;
+  else if (tipo === "Admin") model = Admin;
+  else throw new Error("Tipo de usuário inválido");
+
+  return model.findOne({ email });
+};
 
 exports.register = async (req, res) => {
   try {
     const { nome, email, senha, tipo } = req.body;
 
+    // Verificar se o tipo de usuário é válido
+    if (!["Aluno", "Professor", "Admin"].includes(tipo)) {
+      return res.status(400).json({ message: "Tipo de usuário inválido" });
+    }
+
     // Verificar se o usuário já existe
-    const existingUser = await User.findOne({ email });
+    const existingUser = await findUserByType(tipo, email);
     if (existingUser) {
       return res.status(400).json({ message: "Usuário já existe" });
     }
@@ -17,45 +35,46 @@ exports.register = async (req, res) => {
     const hashedPassword = await bcryptjs.hash(senha, salt);
 
     // Criar novo usuário
-    const user = new User({
-      nome,
-      email,
-      senha: hashedPassword,
-      tipo,
-    });
+    const model = require(`../models/${tipo.toLowerCase()}`);
+    const newUser = new model({ nome, email, senha: hashedPassword });
+    await newUser.save();
 
-    await user.save();
     res.status(201).json({ message: "Usuário criado com sucesso" });
   } catch (error) {
-    res.status(500).json({ message: "Erro ao registrar usuário" });
+    res.status(500).json({ message: error.message });
   }
 };
 
 exports.login = async (req, res) => {
   try {
-    const { email, senha } = req.body;
+    const { email, senha, tipo } = req.body;
 
-    // Verificar se o usuário existe
-    const user = await User.findOne({ email });
+    // Verificar se o tipo de usuário é válido
+    if (!["Aluno", "Professor", "Admin"].includes(tipo)) {
+      return res.status(400).json({ message: "Tipo de usuário inválido" });
+    }
+
+    // Buscar o usuário pelo tipo e email
+    const user = await findUserByType(tipo, email);
     if (!user) {
       return res.status(400).json({ message: "Usuário não encontrado" });
     }
 
-    // Verificar senha
+    // Verificar a senha
     const validPassword = await bcryptjs.compare(senha, user.senha);
     if (!validPassword) {
       return res.status(400).json({ message: "Senha inválida" });
     }
 
-    // Criar e assinar o token
+    // Gerar token JWT
     const token = jwt.sign(
-      { _id: user._id, role: user.tipo },
+      { _id: user._id, role: tipo }, // Inclui o tipo de usuário no token
       process.env.JWT_SECRET,
       { expiresIn: "1h" }
     );
 
-    res.json({ token, userId: user._id, role: user.tipo });
+    res.json({ token, userId: user._id, role: tipo });
   } catch (error) {
-    res.status(500).json({ message: "Erro ao fazer login" });
+    res.status(500).json({ message: error.message });
   }
 };

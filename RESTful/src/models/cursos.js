@@ -8,17 +8,24 @@ const CursosSchema = new mongoose.Schema(
     imagem: { type: String, required: false },
     video: { type: String, required: false },
     promoção: { type: Number, required: true, min: 0 }, // Promoção deve ser positiva
-    professor: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User", // Associa um curso a um professor
-    },
-    alunos: [
+    professor:
       {
         type: mongoose.Schema.Types.ObjectId,
-        ref: "User", // Associa vários alunos a um curso
-      },
+        ref: "Professor", // Um curso pode ser ministrado por um professor
+      },                  // 1 pra 1
+    aluno: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Aluno", // Um curso pode ter vários alunos
+      },              // Muitos pra Muitos
     ],
+    admin: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Admin", // Um curso é gerenciado por apenas um admin
+    },              // Muitos pra 1
+    
   },
+
   { timestamps: true }
 );
 
